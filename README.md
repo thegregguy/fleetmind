@@ -30,7 +30,13 @@ FleetMind is a Streamlit-based application that helps gig-economy drivers track 
 
 All trips between two gas stops are updated retroactively with accurate distances and fuel costs.
 
+For a detailed walkthrough with examples, see [DATA_FLOW_EXAMPLE.md](DATA_FLOW_EXAMPLE.md).
+
 ## Installation
+
+### Quick Start (Demo Mode)
+
+Want to try FleetMind without setting up Google Sheets? See [QUICKSTART.md](QUICKSTART.md) for a 5-minute setup guide!
 
 ### Prerequisites
 - Python 3.8 or higher
