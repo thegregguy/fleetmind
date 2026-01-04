@@ -7,6 +7,7 @@ import os
 from dotenv import load_dotenv
 from typing import Tuple
 from sheets_manager import GoogleSheetsManager
+from demo_mode import DemoSheetsManager
 from ping_manager import PingManager
 from smart_gas_manager import SmartGasManager
 
@@ -27,6 +28,8 @@ if 'ping_manager' not in st.session_state:
     st.session_state.ping_manager = None
 if 'smart_gas_manager' not in st.session_state:
     st.session_state.smart_gas_manager = None
+if 'demo_mode' not in st.session_state:
+    st.session_state.demo_mode = False
 
 
 def initialize_managers():
@@ -34,15 +37,23 @@ def initialize_managers():
     service_account_file = os.getenv('SERVICE_ACCOUNT_FILE', 'service_account.json')
     spreadsheet_id = os.getenv('SPREADSHEET_ID', '')
     
-    if not spreadsheet_id:
-        st.error("⚠️ SPREADSHEET_ID not configured. Please set up your .env file.")
-        st.info("Copy .env.example to .env and add your Google Sheets configuration.")
-        return False
+    # Check if demo mode should be used
+    use_demo = os.getenv('DEMO_MODE', 'false').lower() == 'true'
     
-    if not os.path.exists(service_account_file):
-        st.error(f"⚠️ Service account file not found: {service_account_file}")
-        st.info("Please add your Google Service Account JSON file to the project root.")
-        return False
+    if use_demo or not spreadsheet_id or not os.path.exists(service_account_file):
+        # Use demo mode
+        st.info("ℹ️ Running in DEMO MODE (in-memory storage)")
+        st.caption("To use Google Sheets, configure .env file and add service_account.json")
+        
+        sheets_manager = DemoSheetsManager()
+        sheets_manager.authenticate()
+        
+        st.session_state.sheets_manager = sheets_manager
+        st.session_state.ping_manager = PingManager(sheets_manager)
+        st.session_state.smart_gas_manager = SmartGasManager(sheets_manager)
+        st.session_state.demo_mode = True
+        
+        return True
     
     try:
         sheets_manager = GoogleSheetsManager(service_account_file, spreadsheet_id)
@@ -51,10 +62,14 @@ def initialize_managers():
         st.session_state.sheets_manager = sheets_manager
         st.session_state.ping_manager = PingManager(sheets_manager)
         st.session_state.smart_gas_manager = SmartGasManager(sheets_manager)
+        st.session_state.demo_mode = False
+        
+        st.success("✅ Connected to Google Sheets")
         
         return True
     except Exception as e:
         st.error(f"❌ Failed to initialize: {str(e)}")
+        st.info("Tip: Try demo mode by setting DEMO_MODE=true in .env")
         return False
 
 
@@ -289,6 +304,10 @@ def main():
     if st.session_state.sheets_manager is None:
         if not initialize_managers():
             st.stop()
+    
+    # Show demo mode warning
+    if st.session_state.demo_mode:
+        st.warning("⚠️ Demo Mode Active - Data is stored in memory only and will be lost when you close the app")
     
     # Create tabs
     tab1, tab2, tab3 = st.tabs(["📍 Ping", "⛽ Smart Gas", "ℹ️ About"])
