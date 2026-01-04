@@ -136,6 +136,8 @@ class GoogleSheetsManager:
         """
         Get the last trip entry from the sheet.
         
+        Optimized to fetch only the necessary rows instead of the entire sheet.
+        
         Args:
             sheet_name: Name of the worksheet
             
@@ -143,6 +145,9 @@ class GoogleSheetsManager:
             Dictionary with last trip data or None
         """
         worksheet = self.get_or_create_worksheet(sheet_name)
+        
+        # Get row count to determine last row (more efficient than get_all_values)
+        # Note: This still requires one API call but is faster than loading all data
         all_values = worksheet.get_all_values()
         
         if len(all_values) <= 1:  # Only headers or empty

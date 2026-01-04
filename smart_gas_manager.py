@@ -105,6 +105,7 @@ class SmartGasManager:
         
         updates = []
         blocks_processed = 0
+        variance_warnings = []
         
         # Process each pair of consecutive gas stops
         for i in range(len(gas_stops) - 1):
@@ -125,8 +126,9 @@ class SmartGasManager:
             if real_miles <= 0:
                 continue
             
-            # Get trips between these gas stops (inclusive of endpoints)
-            trips_in_block = df.iloc[prev_gas_idx:curr_gas_idx + 1].copy()
+            # Get trips between these gas stops (EXCLUDE previous gas stop to avoid double-counting)
+            # The previous gas stop's miles belong to the previous tank, not this one
+            trips_in_block = df.iloc[prev_gas_idx + 1:curr_gas_idx + 1].copy()
             
             # Sum Google estimated miles using safe conversion
             google_miles_sum = trips_in_block['Google Miles'].apply(
@@ -138,6 +140,17 @@ class SmartGasManager:
             
             # Calculate variance ratio
             variance_ratio = real_miles / google_miles_sum
+            
+            # Variance safety check: Warn if ratio is outside realistic range (0.8 to 1.2)
+            # This could indicate missing trips or data entry errors
+            if variance_ratio < 0.8 or variance_ratio > 1.2:
+                variance_warnings.append({
+                    'block': i + 1,
+                    'variance_ratio': round(variance_ratio, 3),
+                    'real_miles': real_miles,
+                    'gps_miles': round(google_miles_sum, 2),
+                    'message': f'Unusual variance ratio ({variance_ratio:.2f}x). Check for missing trips or data errors.'
+                })
             
             # Calculate MPG for this block
             total_gallons = trips_in_block['Gallons'].apply(
@@ -187,12 +200,18 @@ class SmartGasManager:
         if updates:
             self.sheets_manager.batch_update_cells(updates)
         
-        return {
+        result = {
             'status': 'success',
             'blocks_processed': blocks_processed,
             'trips_updated': len(updates) // 2,  # Each trip has 2 updates
             'message': f'Successfully reconciled {blocks_processed} block(s) and updated {len(updates) // 2} trip(s)'
         }
+        
+        # Add variance warnings if any
+        if variance_warnings:
+            result['warnings'] = variance_warnings
+        
+        return result
     
     def get_fuel_statistics(self) -> Dict[str, Any]:
         """

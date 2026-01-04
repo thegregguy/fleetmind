@@ -241,6 +241,16 @@ def smart_gas_tab():
                             st.metric("Trips Updated", recon['trips_updated'])
                         
                         st.info(recon['message'])
+                        
+                        # Display variance warnings if any
+                        if 'warnings' in recon and recon['warnings']:
+                            st.warning("⚠️ Variance Warnings Detected")
+                            for warning in recon['warnings']:
+                                st.warning(
+                                    f"**Block {warning['block']}**: Variance ratio {warning['variance_ratio']:.2f}x "
+                                    f"({warning['real_miles']:.0f} actual miles vs {warning['gps_miles']:.0f} GPS miles). "
+                                    f"{warning['message']}"
+                                )
                     else:
                         st.warning(recon.get('message', 'Reconciliation pending'))
                         
@@ -264,6 +274,16 @@ def smart_gas_tab():
                     st.metric("Blocks Processed", result['blocks_processed'])
                 with col2:
                     st.metric("Trips Updated", result['trips_updated'])
+                
+                # Display variance warnings if any
+                if 'warnings' in result and result['warnings']:
+                    st.warning("⚠️ Variance Warnings Detected")
+                    for warning in result['warnings']:
+                        st.warning(
+                            f"**Block {warning['block']}**: Variance ratio {warning['variance_ratio']:.2f}x "
+                            f"({warning['real_miles']:.0f} actual miles vs {warning['gps_miles']:.0f} GPS miles). "
+                            f"{warning['message']}"
+                        )
             else:
                 st.warning(result.get('message', 'No data to reconcile'))
         except Exception as e:
