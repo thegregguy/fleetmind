@@ -20,6 +20,24 @@ class SmartGasManager:
         """
         self.sheets_manager = sheets_manager
     
+    @staticmethod
+    def safe_float_conversion(value: Any) -> float:
+        """
+        Safely convert a value to float, returning 0 if conversion fails.
+        
+        Args:
+            value: Value to convert
+            
+        Returns:
+            Float value or 0 if conversion fails
+        """
+        try:
+            if value == '' or value is None:
+                return 0.0
+            return float(value)
+        except (ValueError, TypeError):
+            return 0.0
+    
     def log_gas_fillup(self,
                        current_coords: tuple,
                        vehicle: str,
@@ -93,22 +111,26 @@ class SmartGasManager:
             prev_gas_idx = gas_stops.index[i]
             curr_gas_idx = gas_stops.index[i + 1]
             
-            # Get odometer readings
-            prev_odometer = float(gas_stops.iloc[i]['Odometer']) if gas_stops.iloc[i]['Odometer'] else None
-            curr_odometer = float(gas_stops.iloc[i + 1]['Odometer']) if gas_stops.iloc[i + 1]['Odometer'] else None
+            # Get odometer readings with safe conversion
+            prev_odometer = self.safe_float_conversion(gas_stops.iloc[i]['Odometer'])
+            curr_odometer = self.safe_float_conversion(gas_stops.iloc[i + 1]['Odometer'])
             
-            if prev_odometer is None or curr_odometer is None:
+            if prev_odometer == 0 or curr_odometer == 0:
                 continue
             
             # Calculate real miles from odometer
             real_miles = curr_odometer - prev_odometer
             
+            # Validate that real_miles is positive (avoid odometer rollover or data entry errors)
+            if real_miles <= 0:
+                continue
+            
             # Get trips between these gas stops (inclusive of endpoints)
             trips_in_block = df.iloc[prev_gas_idx:curr_gas_idx + 1].copy()
             
-            # Sum Google estimated miles
+            # Sum Google estimated miles using safe conversion
             google_miles_sum = trips_in_block['Google Miles'].apply(
-                lambda x: float(x) if x and x != '' else 0
+                self.safe_float_conversion
             ).sum()
             
             if google_miles_sum == 0:
@@ -119,17 +141,17 @@ class SmartGasManager:
             
             # Calculate MPG for this block
             total_gallons = trips_in_block['Gallons'].apply(
-                lambda x: float(x) if x and x != '' else 0
+                self.safe_float_conversion
             ).sum()
             
             block_mpg = real_miles / total_gallons if total_gallons > 0 else 0
             
             # Get price per gallon (use the current gas stop's price)
-            price_per_gal = float(gas_stops.iloc[i + 1]['Price/Gal']) if gas_stops.iloc[i + 1]['Price/Gal'] else 0
+            price_per_gal = self.safe_float_conversion(gas_stops.iloc[i + 1]['Price/Gal'])
             
             # Update each trip in the block
             for idx in trips_in_block.index:
-                google_miles = float(df.loc[idx, 'Google Miles']) if df.loc[idx, 'Google Miles'] else 0
+                google_miles = self.safe_float_conversion(df.loc[idx, 'Google Miles'])
                 
                 # Calculate actual miles
                 actual_miles = google_miles * variance_ratio
@@ -184,22 +206,22 @@ class SmartGasManager:
         if df.empty:
             return {'status': 'no_data'}
         
-        # Calculate statistics
+        # Calculate statistics using safe float conversion
         total_google_miles = df['Google Miles'].apply(
-            lambda x: float(x) if x and x != '' else 0
+            self.safe_float_conversion
         ).sum()
         
         total_actual_miles = df['Actual Miles'].apply(
-            lambda x: float(x) if x and x != '' else 0
+            self.safe_float_conversion
         ).sum()
         
         total_fuel_cost = df['Trip Fuel Cost ($)'].apply(
-            lambda x: float(x) if x and x != '' else 0
+            self.safe_float_conversion
         ).sum()
         
         gas_stops = df[df['Gas Stop?'] == True]
         total_gallons = gas_stops['Gallons'].apply(
-            lambda x: float(x) if x and x != '' else 0
+            self.safe_float_conversion
         ).sum()
         
         return {
